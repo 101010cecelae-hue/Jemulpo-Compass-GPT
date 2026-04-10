@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AR Compass Navigator</title>
+
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: black;
+}
+
+/* CAMERA */
+video {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* GLASS UI */
+.glass {
+  backdrop-filter: blur(20px);
+  background: rgba(20, 20, 30, 0.4);
+  border-radius: 20px;
+  color: white;
+}
+
+/* TOP BAR */
+.top {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+/* DESTINATION */
+.dest {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  font-size: 14px;
+}
+
+/* AR PATH */
+.path {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 50%;
+  pointer-events: none;
+}
+
+.arrow {
+  width: 40px;
+  height: 40px;
+  margin: 10px auto;
+  background: rgba(255,0,0,0.8);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  animation: move 1s infinite linear;
+}
+
+@keyframes move {
+  0% { transform: translateY(40px); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateY(-40px); opacity: 0; }
+}
+
+/* BOTTOM CARD */
+.bottom {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 15px 25px;
+}
+
+/* COMPASS */
+.compass {
+  position: absolute;
+  bottom: 100px;
+  left: 20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.needle {
+  width: 4px;
+  height: 30px;
+  background: red;
+  transform-origin: bottom;
+}
+</style>
+</head>
+
+<body>
+
+<video id="camera" autoplay playsinline></video>
+
+<div class="top glass">Explorer Mode</div>
+
+<div class="dest glass">
+  Incheon Chinatown - 인천 차이나타운<br>
+  <span id="distance">-- m away</span>
+</div>
+
+<div class="path" id="path"></div>
+
+<div class="compass">
+  <div class="needle" id="needle"></div>
+</div>
+
+<div class="bottom glass">
+  <div id="instruction">Initializing...</div>
+</div>
+
+<script>
+// CAMERA
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: "environment" }
+})
+.then(stream => {
+  document.getElementById("camera").srcObject = stream;
+});
+
+// DESTINATION (Chinatown)
+const DEST = {
+  lat: 37.4740,
+  lon: 126.6167
+};
+
+let userLat = 0, userLon = 0;
+let heading = 0;
+
+// GPS
+navigator.geolocation.watchPosition(pos => {
+  userLat = pos.coords.latitude;
+  userLon = pos.coords.longitude;
+
+  const dist = getDistance(userLat, userLon, DEST.lat, DEST.lon);
+  document.getElementById("distance").innerText = Math.round(dist) + "m away";
+
+}, err => alert("GPS error"));
+
+// COMPASS (iOS support)
+function requestOrientation() {
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(res => {
+      if (res === 'granted') startCompass();
+    });
+  } else {
+    startCompass();
+  }
+}
+
+function startCompass() {
+  window.addEventListener("deviceorientation", e => {
+    heading = e.webkitCompassHeading || (360 - e.alpha);
+    update();
+  });
+}
+
+document.body.addEventListener("click", requestOrientation);
+
+// UPDATE UI
+function update() {
+  const bearing = getBearing(userLat, userLon, DEST.lat, DEST.lon);
+  const diff = bearing - heading;
+
+  document.getElementById("needle").style.transform =
+    `rotate(${heading}deg)`;
+
+  document.getElementById("path").style.transform =
+    `rotate(${diff}deg)`;
+
+  // Instruction
+  let text = "Go straight";
+  if (diff > 20) text = "Turn right";
+  if (diff < -20) text = "Turn left";
+
+  document.getElementById("instruction").innerText = text;
+}
+
+// CREATE AR PATH
+const path = document.getElementById("path");
+for (let i = 0; i < 6; i++) {
+  const arrow = document.createElement("div");
+  arrow.className = "arrow";
+  path.appendChild(arrow);
+}
+
+// DISTANCE (Haversine)
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// BEARING
+function getBearing(lat1, lon1, lat2, lon2) {
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const λ1 = lon1 * Math.PI/180;
+  const λ2 = lon2 * Math.PI/180;
+
+  const y = Math.sin(λ2-λ1) * Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) -
+            Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+
+  return (Math.atan2(y, x) * 180/Math.PI + 360) % 360;
+}
+</script>
+
+</body>
+</html>
