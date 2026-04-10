@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AR Compass Navigator</title>
+<title>AR Navigator</title>
 
 <style>
 html, body {
@@ -12,6 +12,7 @@ html, body {
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   background: black;
+  color: white;
 }
 
 /* CAMERA */
@@ -22,32 +23,102 @@ video {
   object-fit: cover;
 }
 
-/* GLASS UI */
+/* GLASS */
 .glass {
-  backdrop-filter: blur(20px);
-  background: rgba(20, 20, 30, 0.4);
-  border-radius: 20px;
-  color: white;
+  backdrop-filter: blur(25px) saturate(180%);
+  background: rgba(20,20,30,0.35);
+  border-radius: 25px;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
 }
 
-/* TOP BAR */
-.top {
+/* SCREEN SYSTEM */
+.screen {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+
+.active {
+  display: block;
+}
+
+/* TOP SEGMENT */
+.segment {
   position: absolute;
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 10px 20px;
-  font-size: 14px;
+  display: flex;
+  gap: 8px;
+  padding: 6px;
 }
 
-/* DESTINATION */
+.segment div {
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.segment .active-tab {
+  background: rgba(255,255,255,0.2);
+  opacity: 1;
+}
+
+/* DESTINATION CARD */
 .dest {
   position: absolute;
   top: 80px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 12px 20px;
-  font-size: 14px;
+  padding: 12px 18px;
+  text-align: center;
+}
+
+/* CATEGORY BAR */
+.categories {
+  position: absolute;
+  top: 150px;
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 0 10px;
+}
+
+.cat {
+  padding: 10px 15px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.1);
+  white-space: nowrap;
+}
+
+.cat.active {
+  background: rgba(255,0,0,0.7);
+}
+
+/* COMPASS BIG */
+.big-compass {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.2), transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.needle {
+  width: 6px;
+  height: 80px;
+  background: red;
+  transform-origin: bottom;
 }
 
 /* AR PATH */
@@ -56,22 +127,39 @@ video {
   bottom: 0;
   width: 100%;
   height: 50%;
-  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .arrow {
   width: 40px;
   height: 40px;
-  margin: 10px auto;
-  background: rgba(255,0,0,0.8);
+  margin: 10px;
+  background: red;
   clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
-  animation: move 1s infinite linear;
+  animation: flow 1.2s infinite;
+  filter: drop-shadow(0 0 10px red);
 }
 
-@keyframes move {
-  0% { transform: translateY(40px); opacity: 0; }
+@keyframes flow {
+  0% { transform: translateY(50px); opacity: 0; }
   50% { opacity: 1; }
-  100% { transform: translateY(-40px); opacity: 0; }
+  100% { transform: translateY(-50px); opacity: 0; }
+}
+
+/* SMALL COMPASS */
+.small-compass {
+  position: absolute;
+  bottom: 120px;
+  left: 20px;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
 /* BOTTOM CARD */
@@ -80,28 +168,31 @@ video {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 15px 25px;
+  padding: 15px 20px;
+  text-align: center;
 }
 
-/* COMPASS */
-.compass {
+/* MAP */
+.map {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(#1a1a2e, #16213e);
+}
+
+/* NAV BUTTONS */
+.nav {
   position: absolute;
-  bottom: 100px;
-  left: 20px;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.2);
+  bottom: 10px;
+  width: 100%;
   display: flex;
-  align-items: center;
   justify-content: center;
+  gap: 20px;
 }
 
-.needle {
-  width: 4px;
-  height: 30px;
-  background: red;
-  transform-origin: bottom;
+.nav button {
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
 }
 </style>
 </head>
@@ -110,125 +201,135 @@ video {
 
 <video id="camera" autoplay playsinline></video>
 
-<div class="top glass">Explorer Mode</div>
+<!-- SCREEN 1 -->
+<div class="screen active" id="screen1">
+  <div class="segment glass">
+    <div class="active-tab">Explorer</div>
+    <div>Historic</div>
+    <div>Easy</div>
+  </div>
 
-<div class="dest glass">
-  Incheon Chinatown - 인천 차이나타운<br>
-  <span id="distance">-- m away</span>
+  <div class="dest glass">
+    Chinatown - 인천 차이나타운<br>
+    <span id="dist1">--m</span>
+  </div>
+
+  <div class="categories">
+    <div class="cat">Chinatown</div>
+    <div class="cat">Performance</div>
+    <div class="cat active">Costume</div>
+    <div class="cat">River</div>
+  </div>
+
+  <div class="big-compass">
+    <div class="needle" id="needle1"></div>
+  </div>
 </div>
 
-<div class="path" id="path"></div>
+<!-- SCREEN 2 -->
+<div class="screen" id="screen2">
+  <div class="dest glass">AR Navigation</div>
 
-<div class="compass">
-  <div class="needle" id="needle"></div>
+  <div class="path" id="path"></div>
+
+  <div class="small-compass">
+    <div class="needle" id="needle2"></div>
+  </div>
+
+  <div class="bottom glass">
+    <div id="instruction">Loading...</div>
+  </div>
 </div>
 
-<div class="bottom glass">
-  <div id="instruction">Initializing...</div>
+<!-- SCREEN 3 -->
+<div class="screen" id="screen3">
+  <div class="map"></div>
+  <div class="bottom glass">Route Overview (Mock)</div>
+</div>
+
+<div class="nav">
+  <button onclick="show(1)">Compass</button>
+  <button onclick="show(2)">AR</button>
+  <button onclick="show(3)">Map</button>
 </div>
 
 <script>
 // CAMERA
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "environment" }
-})
-.then(stream => {
-  document.getElementById("camera").srcObject = stream;
-});
+navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}})
+.then(s=>camera.srcObject=s);
 
-// DESTINATION (Chinatown)
-const DEST = {
-  lat: 37.4740,
-  lon: 126.6167
-};
-
-let userLat = 0, userLon = 0;
-let heading = 0;
+// DEST
+const DEST={lat:37.4740,lon:126.6167};
+let lat=0,lon=0,heading=0;
 
 // GPS
-navigator.geolocation.watchPosition(pos => {
-  userLat = pos.coords.latitude;
-  userLon = pos.coords.longitude;
+navigator.geolocation.watchPosition(p=>{
+ lat=p.coords.latitude;
+ lon=p.coords.longitude;
+ let d=dist(lat,lon,DEST.lat,DEST.lon);
+ dist1.innerText=Math.round(d)+"m";
+});
 
-  const dist = getDistance(userLat, userLon, DEST.lat, DEST.lon);
-  document.getElementById("distance").innerText = Math.round(dist) + "m away";
+// COMPASS
+document.body.onclick=()=>{
+ if(DeviceOrientationEvent.requestPermission){
+   DeviceOrientationEvent.requestPermission().then(r=>{
+     if(r==='granted') start();
+   });
+ } else start();
+};
 
-}, err => alert("GPS error"));
-
-// COMPASS (iOS support)
-function requestOrientation() {
-  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission().then(res => {
-      if (res === 'granted') startCompass();
-    });
-  } else {
-    startCompass();
-  }
+function start(){
+ window.addEventListener("deviceorientation",e=>{
+  heading=e.webkitCompassHeading||(360-e.alpha);
+  update();
+ });
 }
 
-function startCompass() {
-  window.addEventListener("deviceorientation", e => {
-    heading = e.webkitCompassHeading || (360 - e.alpha);
-    update();
-  });
+// UPDATE
+function update(){
+ let b=bearing(lat,lon,DEST.lat,DEST.lon);
+ let diff=b-heading;
+
+ needle1.style.transform=`rotate(${heading}deg)`;
+ needle2.style.transform=`rotate(${heading}deg)`;
+ path.style.transform=`rotate(${diff}deg)`;
+
+ instruction.innerText =
+   diff>20?"Turn right":
+   diff<-20?"Turn left":"Go straight";
 }
 
-document.body.addEventListener("click", requestOrientation);
-
-// UPDATE UI
-function update() {
-  const bearing = getBearing(userLat, userLon, DEST.lat, DEST.lon);
-  const diff = bearing - heading;
-
-  document.getElementById("needle").style.transform =
-    `rotate(${heading}deg)`;
-
-  document.getElementById("path").style.transform =
-    `rotate(${diff}deg)`;
-
-  // Instruction
-  let text = "Go straight";
-  if (diff > 20) text = "Turn right";
-  if (diff < -20) text = "Turn left";
-
-  document.getElementById("instruction").innerText = text;
+// PATH
+for(let i=0;i<7;i++){
+ let a=document.createElement("div");
+ a.className="arrow";
+ path.appendChild(a);
 }
 
-// CREATE AR PATH
-const path = document.getElementById("path");
-for (let i = 0; i < 6; i++) {
-  const arrow = document.createElement("div");
-  arrow.className = "arrow";
-  path.appendChild(arrow);
+// NAV
+function show(n){
+ document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+ document.getElementById("screen"+n).classList.add("active");
 }
 
-// DISTANCE (Haversine)
-function getDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3;
-  const φ1 = lat1 * Math.PI/180;
-  const φ2 = lat2 * Math.PI/180;
-  const Δφ = (lat2-lat1) * Math.PI/180;
-  const Δλ = (lon2-lon1) * Math.PI/180;
-
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ/2) * Math.sin(Δλ/2);
-
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+// MATH
+function dist(a,b,c,d){
+ let R=6371e3;
+ let φ1=a*Math.PI/180,φ2=c*Math.PI/180;
+ let Δφ=(c-a)*Math.PI/180,Δλ=(d-b)*Math.PI/180;
+ let x=Math.sin(Δφ/2)**2+
+ Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+ return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 
-// BEARING
-function getBearing(lat1, lon1, lat2, lon2) {
-  const φ1 = lat1 * Math.PI/180;
-  const φ2 = lat2 * Math.PI/180;
-  const λ1 = lon1 * Math.PI/180;
-  const λ2 = lon2 * Math.PI/180;
-
-  const y = Math.sin(λ2-λ1) * Math.cos(φ2);
-  const x = Math.cos(φ1)*Math.sin(φ2) -
-            Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
-
-  return (Math.atan2(y, x) * 180/Math.PI + 360) % 360;
+function bearing(a,b,c,d){
+ let φ1=a*Math.PI/180,φ2=c*Math.PI/180;
+ let λ1=b*Math.PI/180,λ2=d*Math.PI/180;
+ let y=Math.sin(λ2-λ1)*Math.cos(φ2);
+ let x=Math.cos(φ1)*Math.sin(φ2)-
+ Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+ return (Math.atan2(y,x)*180/Math.PI+360)%360;
 }
 </script>
 
